@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { scoreAsset } from "@/lib/risk";
 
 type Organization = { id: string; name: string; region: string; team_code: string };
 type Membership = { organization_id: string; role: string; organization: Organization };
@@ -15,27 +16,6 @@ const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC
 const classes = ["Rotating equipment", "Pump", "Motor", "Compressor", "Conveyor", "Electrical", "Pressure system", "Other"];
 const nowIso = () => new Date().toISOString();
 const localInputTime = (hours: number) => { const d = new Date(Date.now() + hours * 3_600_000); return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); };
-
-function scoreAsset(asset: Asset, observation?: Observation) {
-  if (!observation) return { score: null as number | null, factors: ["No condition reading yet"] };
-  let score = (6 - asset.criticality) * 4;
-  const factors: string[] = [];
-  if (observation.vibration_mm_s != null) {
-    if (observation.vibration_mm_s >= 7.1) { score += 35; factors.push("Vibration at or above high screening band"); }
-    else if (observation.vibration_mm_s >= 4.5) { score += 22; factors.push("Vibration in elevated screening band"); }
-    else if (observation.vibration_mm_s >= 2.8) { score += 10; factors.push("Vibration above baseline band"); }
-  }
-  if (observation.temperature_c != null) {
-    if (observation.temperature_c >= 90) { score += 30; factors.push("Temperature at or above high screening band"); }
-    else if (observation.temperature_c >= 75) { score += 18; factors.push("Temperature in elevated screening band"); }
-    else if (observation.temperature_c >= 60) { score += 8; factors.push("Temperature above baseline band"); }
-  }
-  if (observation.pressure_bar != null && observation.pressure_bar <= 0) { score += 16; factors.push("Pressure reading is non-positive"); }
-  if (asset.status === "offline") { score += 20; factors.push("Asset is marked offline"); }
-  score = Math.max(0, Math.min(100, Math.round(score)));
-  if (!factors.length) factors.push("No entered measurement exceeds the generic screening bands");
-  return { score, factors };
-}
 
 function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value)) : "Not scheduled"; }
 
